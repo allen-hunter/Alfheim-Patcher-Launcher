@@ -65,5 +65,14 @@ namespace VikingBros
         {
             System.Diagnostics.Process.Start("explorer.exe", System.AppDomain.CurrentDomain.BaseDirectory);
         }
+
+        private void ButtonPatreon_Click(object sender, RoutedEventArgs e)
+        {
+            string target = ConfigurationManager.AppSettings.Get("PatreonPage");// "https://discord.com/invite/TVfFTbD8?utm_source=Discord%20Widget&utm_medium=Connect&username=null";
+            if (null != target)
+            {
+                System.Diagnostics.Process.Start(target);
+            }
+        }
     }
 }
