@@ -15,11 +15,11 @@
 			<ColumnDefinition Width="281*"/>
 		</Grid.ColumnDefinitions>
 		<Button x:Name="ButtonLaunch" Content="{Binding PlayableStatus}" HorizontalAlignment="Left" Margin="142,365,0,0" VerticalAlignment="Top" Height="33" Width="97" Grid.Column="1" Click="ButtonLaunch_Click" IsEnabled="{Binding ReadyToLaunch}" Background="#FFF07A00"/>
-		<Button x:Name="ButtonDiscord" Content="Discord" HorizontalAlignment="Left" Margin="183,328,0,0" VerticalAlignment="Top" Grid.Column="1" Height="20" Width="56" Click="ButtonDiscord_Click" Background="#FFB7A6B4"/>
+		<Button x:Name="ButtonDiscord" Content="Discord" HorizontalAlignment="Left" Margin="152,328,0,0" VerticalAlignment="Top" Grid.Column="1" Height="20" Width="87" Click="ButtonDiscord_Click" Background="#FFB7A6B4"/>
 		<ProgressBar x:Name="ProgressPatch" HorizontalAlignment="Left" Height="10" Margin="44,388,0,0" VerticalAlignment="Top" Width="534" Grid.ColumnSpan="2" Value="{Binding FilesProcessed}" Maximum="{Binding NumberTotalFiles}"/>
-		<Button x:Name="ButtonWiki" Content="Wiki" HorizontalAlignment="Left" Margin="183,297,0,0" VerticalAlignment="Top" Width="56" Grid.Column="1" Height="20" Click="ButtonWiki_Click" Background="#FFB7A6B4"/>
+		<Button x:Name="ButtonWiki" Content="Wiki" HorizontalAlignment="Left" Margin="152,297,0,0" VerticalAlignment="Top" Width="87" Grid.Column="1" Height="20" Click="ButtonWiki_Click" Background="#FFB7A6B4"/>
 		<Label x:Name="LabelPatchInfo" Content="{Binding CurrentMessage, Mode=OneWay, NotifyOnTargetUpdated=True}"  HorizontalAlignment="Left" Height="32" Margin="44,351,0,0" VerticalAlignment="Top" Width="534" Background="#1a1c20" Opacity=".8" Foreground="#797980" Grid.ColumnSpan="2"/>
-		<Button x:Name="ButtonFiles" Grid.Column="1" Content="Files" HorizontalAlignment="Left" Margin="183,265,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.923,-0.391" Width="56" Click="ButtonFiles_Click" Height="20" Background="#FFB7A6B4"/>
+		<Button x:Name="ButtonFiles" Grid.Column="1" Content="Optional Mods" HorizontalAlignment="Left" Margin="152,265,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.923,-0.391" Width="87" Click="ButtonFiles_Click" Height="20" Background="#FFB7A6B4"/>
 		<Image Grid.ColumnSpan="2" HorizontalAlignment="Left" Height="186" Margin="431,-2,0,0" VerticalAlignment="Top" Width="365"  Source="/Logo1_with_Text_Purple.png">
 		</Image>
 		<WebBrowser x:Name="MOTDWIndow" HorizontalAlignment="Left" Height="336" Margin="44,10,0,0" VerticalAlignment="Top" Width="395" Source="https://ahunter3.firstcloudit.com/updates.html"/>
