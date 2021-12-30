@@ -15,6 +15,7 @@ using System.Windows.Shapes;
 using System.Configuration;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Timers;
 
 namespace VikingBros
 {
@@ -23,10 +24,13 @@ namespace VikingBros
     /// </summary>
     public partial class MainWindow : Window
     {
+        Patcher m_patcher = new Patcher();
+        private static System.Timers.Timer m_IsLaunchedTimer;
+
         public MainWindow()
         {
             InitializeComponent();
-            Patcher m_patcher = new Patcher();
+            
             DataContext = m_patcher;
             MOTDWIndow.Source = new Uri(ConfigurationManager.AppSettings.Get("MOTD"));
        
@@ -44,6 +48,11 @@ namespace VikingBros
             proc.StartInfo.UseShellExecute = true;
             proc.StartInfo.Verb = "runas";
             proc.Start();
+
+            // keep from launching again
+            m_patcher.ChangeLaunchable("Game Running", false);
+            // start timer looking for whether the game is running or not
+            SetTimer();
         }
 
         private void ButtonDiscord_Click(object sender, RoutedEventArgs e)
@@ -63,7 +72,8 @@ namespace VikingBros
 
         private void ButtonFiles_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Process.Start("explorer.exe", System.AppDomain.CurrentDomain.BaseDirectory);
+            string sPath = System.AppDomain.CurrentDomain.BaseDirectory + "BepInEx\\plugins\\Optional Mods";
+            System.Diagnostics.Process.Start("explorer.exe", sPath);
         }
 
         private void ButtonPatreon_Click(object sender, RoutedEventArgs e)
@@ -72,6 +82,27 @@ namespace VikingBros
             if (null != target)
             {
                 System.Diagnostics.Process.Start(target);
+            }
+        }
+
+        private void SetTimer()
+        {
+            // Create a timer with a two second interval.
+            m_IsLaunchedTimer = new System.Timers.Timer(2000);
+            // Hook up the Elapsed event for the timer. 
+            m_IsLaunchedTimer.Elapsed += OnIsLaunchedTimer;
+            m_IsLaunchedTimer.AutoReset = true;
+            m_IsLaunchedTimer.Enabled = true;
+        }
+
+        private  void OnIsLaunchedTimer(Object source, ElapsedEventArgs e)
+        {
+            Process[] processes = Process.GetProcessesByName("valheim");
+            if (processes.Length == 0)
+            {
+                m_patcher.ChangeLaunchable("Play Game", true);
+                m_IsLaunchedTimer.Stop();
+                m_IsLaunchedTimer.Dispose();
             }
         }
     }

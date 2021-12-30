@@ -59,7 +59,7 @@ public class Patcher : INotifyPropertyChanged
                        WinSCP.EnumerationOptions.AllDirectories;
                 IEnumerable<RemoteFileInfo> fileInfos =
                     session.EnumerateRemoteFiles(remotePath, null, opts);
-                NumberTotalFiles = 0;
+                int NumberFilesToPatch = 0;
                 //iterate through the files and compare dates
                 foreach (var fileInfo in fileInfos)
                 {
@@ -68,26 +68,29 @@ public class Patcher : INotifyPropertyChanged
                     FileInfo localFile = new FileInfo(sRemotePathName);
                     if(!localFile.Exists) // we dont have a local copy
                     {
-                        NumberTotalFiles++;
+                        NumberFilesToPatch++;
                         continue;
                     }
-                    DateTime dRemoteTime = fileInfo.LastWriteTime;
-                    DateTime dLocalTime = localFile.LastWriteTime;
-                    if(dRemoteTime > dLocalTime)
+                    long nRemoteSize =fileInfo.Length;
+                    long nLocalSize = localFile.Length;
+                    if(nRemoteSize != nLocalSize)
                     {
-                        NumberTotalFiles++;
+                        NumberFilesToPatch++;
                     }
                 }
-
+                NumberTotalFiles = NumberFilesToPatch;
                 // Synchronize files
                 if (NumberTotalFiles > 0)
                 {
                     AnnounceProgress(0, NumberTotalFiles, "Updating Files...");
+                    TransferOptions tOptions = new TransferOptions();
+                    // White List
+                    tOptions.FileMask = "*|AlfheimLauncher.exe;  WinSCP.exe; WinSCPnet.dll; AlfheimLauncher.pdb; config/; Optional Mods/;";
                     SynchronizationResult synchronizationResult;
                     synchronizationResult =
                         session.SynchronizeDirectories(
                             SynchronizationMode.Local,
-                            System.AppDomain.CurrentDomain.BaseDirectory, remotePath, false);
+                            System.AppDomain.CurrentDomain.BaseDirectory, remotePath, true, false, SynchronizationCriteria.Size,tOptions);
 
                     // Throw on any error
                     synchronizationResult.Check();
@@ -97,15 +100,29 @@ public class Patcher : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            string sMessage = string.Format("There were errors updating: {0}", ex.Message);
-            AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
+            if (ex.GetType() == typeof(TimeoutException))
+            {
+                string sMessage = "Connection timed out.  Attempting to recover...";
+                AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
+                Patch();
+            }
+            else
+            {
+                string sMessage = string.Format("There were errors updating: {0}", ex.Message);
+                AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
+            }
         }
-        PlayableStatus = "Play Game";
-        OnPropertyChanged("PlayableStatus");
-        ReadyToLaunch = true;
-        OnPropertyChanged("ReadyToLaunch");
+        ChangeLaunchable("Play Game", true);
     }
 
+    // we make this public so that the gui can call changes
+    public void ChangeLaunchable(string p_sStatus, bool p_bLaunchable)
+    {
+        PlayableStatus = p_sStatus;
+        OnPropertyChanged("PlayableStatus");
+        ReadyToLaunch = p_bLaunchable;
+        OnPropertyChanged("ReadyToLaunch");
+    }
     // we keep our credentials in their own function for ease of maintenance
     protected SessionOptions GetSCPSessionOptions()
     {
