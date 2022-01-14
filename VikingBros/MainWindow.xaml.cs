@@ -27,6 +27,7 @@ namespace VikingBros
     {
         Patcher m_patcher = new Patcher();
         private static System.Timers.Timer m_IsLaunchedTimer;
+        private static System.Timers.Timer m_MOTDTimer;
 
         public MainWindow()
         {
@@ -34,7 +35,7 @@ namespace VikingBros
             
             DataContext = m_patcher;
             MOTDWIndow.Source = new Uri(ConfigurationManager.AppSettings.Get("MOTD"));
-       
+            SetMOTDTimer();
             Task T1 = new Task(m_patcher.Patch);
             T1.Start();
         }
@@ -61,7 +62,7 @@ namespace VikingBros
             // keep from launching again
             m_patcher.ChangeLaunchable("Game Running", false);
             // start timer looking for whether the game is running or not
-            SetTimer();
+            SetGameCheckTimer();
         }
 
         private void ButtonDiscord_Click(object sender, RoutedEventArgs e)
@@ -94,7 +95,16 @@ namespace VikingBros
             }
         }
 
-        private void SetTimer()
+        private void SetMOTDTimer()
+        {
+            // 5 minute timer
+            m_MOTDTimer = new Timer(5*60*1000);//minutes*seconds*milliseconds
+            m_MOTDTimer.Elapsed += OnMOTDTimer;
+            m_MOTDTimer.AutoReset = true;
+            m_MOTDTimer.Enabled = true;
+        }
+
+        private void SetGameCheckTimer()
         {
             // Create a timer with a two second interval.
             m_IsLaunchedTimer = new System.Timers.Timer(2000);
@@ -102,6 +112,13 @@ namespace VikingBros
             m_IsLaunchedTimer.Elapsed += OnIsLaunchedTimer;
             m_IsLaunchedTimer.AutoReset = true;
             m_IsLaunchedTimer.Enabled = true;
+        }
+
+        private void OnMOTDTimer(Object source, ElapsedEventArgs e)
+        {
+            this.Dispatcher.Invoke(() => {
+                MOTDWIndow.Refresh();
+            }); 
         }
 
         private  void OnIsLaunchedTimer(Object source, ElapsedEventArgs e)
