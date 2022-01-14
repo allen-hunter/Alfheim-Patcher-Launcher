@@ -17,6 +17,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Timers;
 
+
 namespace VikingBros
 {
     /// <summary>
@@ -43,6 +44,14 @@ namespace VikingBros
         // Starts Valheim as admin
         private void ButtonLaunch_Click(object sender, RoutedEventArgs e)
         {
+            // only launch if steam is running
+            Process[] processes = Process.GetProcessesByName("Steam");
+            if (processes.Length == 0)
+            {
+                MessageBox.Show("Alfheim requires that you be running steam.");
+                return;
+            }
+
             Process proc = new Process();
             proc.StartInfo.FileName = "valheim.exe";
             proc.StartInfo.UseShellExecute = true;
