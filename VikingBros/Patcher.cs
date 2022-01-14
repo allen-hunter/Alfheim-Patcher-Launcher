@@ -6,6 +6,7 @@ using WinSCP;
 using System.Linq;
 using System.ComponentModel;
 using System.Configuration;
+using System.Threading.Tasks;
 
 public delegate void Notify();
 
@@ -36,64 +37,60 @@ public class Patcher : INotifyPropertyChanged
     {
         PlayableStatus = "Updating...";
         OnPropertyChanged("PlayableStatus");
+        string sFileMask = "*|AlfheimLauncher.exe;  WinSCP.exe; WinSCPnet.dll; AlfheimLauncher.pdb; config/; Optional Mods/; cache/; LogOutput.log; patchlogs/;"; // white listed files we ignore
+
+        CurrentMessage = "starting";
+        FilesProcessed = 0;
+        NumberTotalFiles = 354;//current modpack
+        ReadyToLaunch = false;
+
+        // one of the optional mods requires exceptions for valheim_Data
+        if (UseCustomAssets())
+        {
+            AnnounceProgress(0, NumberTotalFiles, "Custom valheim_Data detected, installing...");
+            sFileMask += " valheim_Data/;";
+            CopyLatestAssets();
+        }
+ 
+            
         try
         {
             using (Session session = new Session())
             {
-                CurrentMessage = "starting";
-                FilesProcessed = 0;
-                NumberTotalFiles = 354;//current modpack
-                ReadyToLaunch = false;
+                Directory.CreateDirectory("patchlogs");
+                session.DebugLogPath = "patchlogs\\patchdebug.txt";
+                session.XmlLogPath = "patchlogs\\xmllog.xml";//System.AppDomain.CurrentDomain.BaseDirectory;
+                //session.XmlLogPreserve = true;
+                session.SessionLogPath = "patchlogs\\patchlog.txt";
+               
                 SessionOptions sessionOptions = GetSCPSessionOptions();
 
                 // Will continuously report progress of synchronization
                 session.FileTransferred += FileTransferred;
+                session.OutputDataReceived += OutputDataReceived;
 
                 // Connect
                 AnnounceProgress(0, NumberTotalFiles, "Contacting the server...");
                 session.Open(sessionOptions);
 
                 // get a count of files to possibly be patched
-                AnnounceProgress(0, NumberTotalFiles, "Checking for updates...");
-                var opts = WinSCP.EnumerationOptions.EnumerateDirectories |
-                       WinSCP.EnumerationOptions.AllDirectories;
-                IEnumerable<RemoteFileInfo> fileInfos =
-                    session.EnumerateRemoteFiles(remotePath, null, opts);
-                int NumberFilesToPatch = 0;
-                //iterate through the files and compare dates
-                foreach (var fileInfo in fileInfos)
-                {
-                    if (fileInfo.IsDirectory) continue;
-                    string sRemotePathName = fileInfo.FullName.Replace("/"+remotePath+"/", "");
-                    FileInfo localFile = new FileInfo(sRemotePathName);
-                    if(!localFile.Exists) // we dont have a local copy
-                    {
-                        NumberFilesToPatch++;
-                        continue;
-                    }
-                    long nRemoteSize =fileInfo.Length;
-                    long nLocalSize = localFile.Length;
-                    if(nRemoteSize != nLocalSize)
-                    {
-                        NumberFilesToPatch++;
-                    }
-                }
-                NumberTotalFiles = NumberFilesToPatch;
+                AnnounceProgress(0, NumberTotalFiles, "Checking for updates (this can take a while)...");
+
+                TransferOptions tOptions = new TransferOptions();
+                // White List
+                tOptions.FileMask = sFileMask;
+
+                ComparisonDifferenceCollection diffs = session.CompareDirectories(SynchronizationMode.Local, System.AppDomain.CurrentDomain.BaseDirectory, remotePath, true, false, SynchronizationCriteria.Size, tOptions);
+                NumberTotalFiles = diffs.Count;
+
                 // Synchronize files
                 if (NumberTotalFiles > 0)
                 {
                     AnnounceProgress(0, NumberTotalFiles, "Updating Files...");
-                    TransferOptions tOptions = new TransferOptions();
-                    // White List
-                    tOptions.FileMask = "*|AlfheimLauncher.exe;  WinSCP.exe; WinSCPnet.dll; AlfheimLauncher.pdb; config/; Optional Mods/;";
-                    SynchronizationResult synchronizationResult;
-                    synchronizationResult =
-                        session.SynchronizeDirectories(
-                            SynchronizationMode.Local,
-                            System.AppDomain.CurrentDomain.BaseDirectory, remotePath, true, false, SynchronizationCriteria.Size,tOptions);
-
-                    // Throw on any error
-                    synchronizationResult.Check();
+                    foreach(ComparisonDifference diff in diffs)
+                    {
+                        diff.Resolve(session, tOptions);
+                    }
                 }
                 AnnounceProgress(NumberTotalFiles, NumberTotalFiles, "Game up to date");
             }
@@ -105,6 +102,26 @@ public class Patcher : INotifyPropertyChanged
                 string sMessage = "Connection timed out.  Attempting to recover...";
                 AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
                 Patch();
+            }
+            else if(ex.GetType() == typeof(InvalidOperationException))
+            {
+                string sMessage = string.Format("There were errors connecting to the server: {0}", ex.Message);
+                AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
+            }
+            else if (ex.GetType() == typeof(ArgumentException))
+            {
+                string sMessage = string.Format("There were errors executing the whitelist: {0}", ex.Message);
+                AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
+            }
+            else if (ex.GetType() == typeof(ArgumentOutOfRangeException))
+            {
+                string sMessage = string.Format("There were errors executing the whitelist (argument out of range): {0}", ex.Message);
+                AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
+            }
+            else if (ex.GetType() == typeof(SessionLocalException))
+            {
+                string sMessage = string.Format("There were errors communicating with winscp.com (argument out of range): {0}", ex.Message);
+                AnnounceProgress(NumberTotalFiles, NumberTotalFiles, sMessage);
             }
             else
             {
@@ -123,6 +140,46 @@ public class Patcher : INotifyPropertyChanged
         ReadyToLaunch = p_bLaunchable;
         OnPropertyChanged("ReadyToLaunch");
     }
+
+    // look to see if the user is using custom valheim data
+    private bool UseCustomAssets()
+    {
+        return Directory.Exists("BepInEx/plugins/Optional Mods/valheim_Data");
+    }
+
+    // copy valheim_data assets that are newer
+    private void CopyLatestAssets()
+    {
+        string sourcePath = "BepInEx/plugins/Optional Mods/valheim_Data";
+        string destinationPath = "valheim_Data";
+
+        string[] directories = System.IO.Directory.GetDirectories(sourcePath, "*.*", SearchOption.AllDirectories);
+        Parallel.ForEach(directories, dirPath =>
+        {
+            Directory.CreateDirectory(dirPath.Replace(sourcePath, destinationPath));
+        });
+
+        string[] files = System.IO.Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories);
+
+        Parallel.ForEach(files, newPath =>
+        {
+            FileInfo oldFile = new FileInfo(newPath);
+            FileInfo newFile = new FileInfo(newPath.Replace(sourcePath, destinationPath));
+            if(newFile.Exists)
+            { 
+                if(oldFile.LastWriteTime > newFile.LastWriteTime)
+                { 
+                    File.Copy(newPath, newPath.Replace(sourcePath, destinationPath),true);
+                }
+            }
+            else
+            {
+                File.Copy(newPath, newPath.Replace(sourcePath, destinationPath));
+            }
+        });
+
+    }
+
     // we keep our credentials in their own function for ease of maintenance
     protected SessionOptions GetSCPSessionOptions()
     {
@@ -169,4 +226,14 @@ public class Patcher : INotifyPropertyChanged
             AnnounceProgress(FilesProcessed, NumberTotalFiles, sMessage);
         }
     }
+
+    protected void OutputDataReceived(object sender, OutputDataReceivedEventArgs e)
+    {
+        if (e.Data != null)
+        {
+            string sMessage = e.Data;
+            //AnnounceProgress(FilesProcessed, NumberTotalFiles, sMessage);
+        }
+    }
 }
+
